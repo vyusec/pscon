@@ -1,0 +1,10 @@
+pscon
+Copyright 2026 Ciatech Network
+
+JSner - Advanced Endpoint Extractor is maintained and distributed separately at
+https://github.com/vyusec/JSner under the Mozilla Public License 2.0. The original
+extension is Copyright its contributors. Its pscon bridge modifications remain
+under the same MPL-2.0 terms; see the LICENSE in the JSner repository.
+
+The `pscon` Rust package is licensed under the Apache License, Version 2.0. See
+`LICENSE`.

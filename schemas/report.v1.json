@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ciatech.network/pscon/report.v1.json",
+  "title": "pscon report",
+  "type": "object",
+  "required": ["schema_version", "scan", "assets", "endpoints", "secrets", "verifications", "decisions", "stats"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "scan": { "type": "object" },
+    "assets": { "type": "array" },
+    "endpoints": { "type": "array" },
+    "secrets": { "type": "array" },
+    "verifications": { "type": "array" },
+    "decisions": { "type": "array" },
+    "stats": { "type": "object", "additionalProperties": { "type": "integer" } }
+  }
+}

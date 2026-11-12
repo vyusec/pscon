@@ -1,0 +1,11 @@
+{
+  "version": 3,
+  "file": "app.js",
+  "sources": ["src/app.ts", "src/admin.ts"],
+  "sourcesContent": [
+    "export const users = fetch('/api/v1/users');\nconst key = 'AKIAIOSFODNN7EXAMPLE';\n",
+    "export const admin = fetch('/api/v1/admin/impersonate', { method: 'POST' });\n"
+  ],
+  "names": [],
+  "mappings": ""
+}

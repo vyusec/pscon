@@ -1,0 +1,71 @@
+# pscon example configuration.
+# Copy to ~/.config/pscon/config.toml (or point PSCON_CONFIG at it).
+
+[general]
+# data_dir = "~/.local/share/pscon"
+concurrency = 16
+timeout_secs = 20
+max_body_bytes = 5000000
+user_agent = "pscon/0.1.0 (+https://github.com/ciatech-network/pscon)"
+
+[scope]
+# file = "~/.config/pscon/scope.txt"
+allow_private_ips = true
+respect_robots = false
+
+[recon]
+crawl_depth = 2
+max_pages = 200
+max_assets = 1000
+fetch_source_maps = true
+scan_secrets = true
+verify = true
+safe_methods = ["GET", "HEAD", "OPTIONS"]
+rate_limit_per_host_ms = 120
+max_redirects = 5
+include_third_party = false
+
+[bridge]
+bind = "127.0.0.1"
+port = 8787
+# token = "leave empty to generate one in the data directory"
+allowed_origins = ["chrome-extension://*", "moz-extension://*"]
+auto_start_laya = true
+
+[decisions]
+enabled = true
+provider_order = ["laya", "jev", "luna"]
+confidence_threshold = 0.75
+high_impact_threshold = 0.9
+max_cost_usd = 0.50
+max_calls = 5000
+cache_ttl_days = 30
+redact_cloud = true
+
+[decisions.laya]
+base_url = "http://127.0.0.1:8766"
+autostart = true
+# venv = "~/.local/share/pscon/laya-venv"
+python = "python3.12"
+api_key_env = "LAYA_API_KEY"
+
+[decisions.jev]
+base_url = "https://jevtypesafeai.com/api/v1/decide"
+api_key_env = "JEV_API_KEY"
+model = "jev-latest"
+
+[decisions.luna]
+base_url = "https://api.openai.com/v1/decisions"
+api_key_env = "OPENAI_API_KEY"
+model = "gpt-6-luna"
+
+[notify]
+desktop = true
+ntfy_topic = ""
+ntfy_server = "https://ntfy.sh"
+ntfy_token_env = "NTFY_TOKEN"
+webhook_url = ""
+webhook_kind = "generic"
+telegram_bot_token_env = "TELEGRAM_BOT_TOKEN"
+telegram_chat_id = ""
+on = ["complete", "critical", "failed"]

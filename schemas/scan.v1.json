@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ciatech.network/pscon/scan.v1.json",
+  "title": "pscon scan snapshot",
+  "type": "object",
+  "required": ["target", "page_url", "resources", "network", "captured_at"],
+  "properties": {
+    "target": { "type": "string", "format": "uri" },
+    "page_url": { "type": "string", "format": "uri" },
+    "title": { "type": ["string", "null"] },
+    "html": { "type": ["string", "null"] },
+    "resources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["url", "kind"],
+        "properties": {
+          "url": { "type": "string" },
+          "kind": { "type": "string" },
+          "method": { "type": ["string", "null"] },
+          "status": { "type": ["integer", "null"] },
+          "content_type": { "type": ["string", "null"] },
+          "initiator": { "type": ["string", "null"] },
+          "size": { "type": ["integer", "null"] },
+          "inline": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "network": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["url", "method"],
+        "properties": {
+          "url": { "type": "string" },
+          "method": { "type": "string" },
+          "status": { "type": ["integer", "null"] },
+          "resource_type": { "type": ["string", "null"] },
+          "initiator": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "inline_scripts": { "type": "array", "items": { "type": "string" } },
+    "storage_keys": { "type": "array", "items": { "type": "string" } },
+    "extension_version": { "type": ["string", "null"] },
+    "captured_at": { "type": "string", "format": "date-time" }
+  }
+}

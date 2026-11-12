@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ciatech.network/pscon/finding.v1.json",
+  "title": "pscon finding",
+  "type": "object",
+  "required": ["id", "kind", "risk", "title"],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "kind": { "enum": ["endpoint", "secret", "asset", "verification"] },
+    "risk": { "type": "number", "minimum": 0, "maximum": 1 },
+    "title": { "type": "string" },
+    "url": { "type": ["string", "null"] },
+    "evidence": { "type": ["string", "null"] },
+    "provider": { "type": ["string", "null"] },
+    "confidence": { "type": ["number", "null"] }
+  }
+}
