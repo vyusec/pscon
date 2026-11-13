@@ -6,7 +6,7 @@
 concurrency = 16
 timeout_secs = 20
 max_body_bytes = 5000000
-user_agent = "pscon/0.1.0 (+https://github.com/ciatech-network/pscon)"
+user_agent = "pscon/0.1.0 (+https://github.com/vyusec/pscon)"
 
 [scope]
 # file = "~/.config/pscon/scope.txt"

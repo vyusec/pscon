@@ -1,67 +1,91 @@
-name: Publish to crates.io
+name: Publish pscon
 
 on:
-  pull_request:
   push:
-    tags:
-      - "v*"
+    tags: ['v*']
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to publish or retry (for example v0.1.1)
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
 
 permissions:
   contents: read
 
+concurrency:
+  group: publish-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   verify:
-    name: Verify registry package
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - name: Install the pinned Rust toolchain
-        run: rustup show
-      - name: Check release tag matches the package version
-        if: github.ref_type == 'tag'
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          python3 - <<'PY'
-          import os
-          import tomllib
-          from pathlib import Path
-
-          manifest = tomllib.loads(Path("Cargo.toml").read_text())
-          expected = "v" + manifest["package"]["version"]
-          actual = os.environ["RELEASE_TAG"]
-          if actual != expected:
-              raise SystemExit(f"Release tag {actual!r} must match {expected!r}")
-          PY
-      - name: Test the package
-        run: cargo test --locked
-      - name: Verify registry package
-        run: cargo package --package pscon --locked --registry crates-io
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ inputs.tag || github.ref_name }}
 
   publish:
-    name: Publish registry package
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs: verify
     runs-on: ubuntu-24.04
+    timeout-minutes: 35
     environment: crates-io
-    concurrency:
-      group: crates-io-publish
-      cancel-in-progress: false
+    env:
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.tag || github.ref_name }}
+          fetch-depth: 0
           persist-credentials: false
+      - name: Verify immutable release tag and main ancestry
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          git show-ref --verify "refs/tags/$RELEASE_TAG"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+          git merge-base --is-ancestor HEAD origin/main
+          python3 scripts/check-release.py --tag "$RELEASE_TAG"
       - name: Install the pinned Rust toolchain
         run: rustup show
-      - name: Publish pscon
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: rust-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-ci
+          restore-keys: rust-${{ runner.os }}-
+      - name: Check whether this exact revision is already published
+        id: registry
+        run: python3 scripts/registry-status.py >> "$GITHUB_OUTPUT"
+      - name: Publish to crates.io
+        if: steps.registry.outputs.published != 'true'
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
           if [ -z "$CARGO_REGISTRY_TOKEN" ]; then
-            echo "Set CARGO_REGISTRY_TOKEN in the crates-io environment secrets."
+            echo 'Configure CARGO_REGISTRY_TOKEN in the crates-io environment.'
             exit 1
           fi
           cargo publish --package pscon --locked --registry crates-io
+      - name: Verify the registry revision after publishing
+        run: python3 scripts/registry-status.py --require-published
+      - name: Build the CLI release bundle
+        run: ./scripts/package.sh
+      - name: Attach versioned assets to the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --verify-tag --generate-notes
+          fi
+          python3 scripts/upload-release.py "$RELEASE_TAG" dist/*.tar.gz dist/*.sha256

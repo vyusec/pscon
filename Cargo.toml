@@ -11,7 +11,7 @@ readme = "README.md"
 keywords = ["recon", "security", "cli", "javascript", "tui"]
 categories = ["command-line-utilities"]
 publish = ["crates-io"]
-include = ["src/**", "Cargo.toml", "LICENSE", "NOTICE"]
+include = ["src/**", "Cargo.toml", "LICENSE", "NOTICE", "CHANGELOG.md"]
 
 
 [dependencies]
