@@ -14,9 +14,6 @@ unmaintained = "all"
 # Vulnerability advisories must never be ignored here without a fix plan.
 ignore = [
     { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained notice; no known vulnerability. Track migration to jiff." },
-    { id = "RUSTSEC-2026-0370", reason = "zvariant via notify-rust -> zbus 5; resolved when notify-rust adopts zbus 6." },
-    { id = "RUSTSEC-2026-0371", reason = "zbus_names via notify-rust -> zbus 5; resolved when notify-rust adopts zbus 6." },
-    { id = "RUSTSEC-2026-0372", reason = "zvariant_derive via notify-rust -> zbus 5; resolved when notify-rust adopts zbus 6." },
 ]
 
 [licenses]
