@@ -11,6 +11,9 @@ updates:
     commit-message:
       prefix: deps
     groups:
+      # oxc crates share types across crates and must always move in lockstep.
+      oxc:
+        patterns: ['oxc_*']
       cargo-compatible:
         update-types: [minor, patch]
 
