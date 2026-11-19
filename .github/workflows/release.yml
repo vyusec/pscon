@@ -18,8 +18,20 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Fail loudly (rather than silently skipping) when started from any branch but main.
+  guard:
+    name: Require main
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Releases are only cut from main
+        run: |
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "::error::Releases can only be run from main (got $GITHUB_REF)."
+            exit 1
+          fi
+
   verify:
-    if: github.ref == 'refs/heads/main'
+    needs: guard
     uses: ./.github/workflows/ci.yml
 
   prepare:
@@ -37,13 +49,31 @@ jobs:
           persist-credentials: true
       - name: Install the pinned Rust toolchain
         run: rustup show
+      - name: Refuse empty releases
+        run: |
+          previous="$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' 2>/dev/null || true)"
+          if [ -n "$previous" ]; then
+            count="$(git rev-list --count "$previous"..HEAD)"
+            echo "Commits since $previous: $count"
+            if [ "$count" = 0 ]; then
+              echo "::error::No commits on main since $previous; nothing to release."
+              exit 1
+            fi
+          else
+            echo "No previous release tag; releasing all history."
+          fi
       - name: Resolve the next version
         id: version
         env:
           BUMP: ${{ inputs.bump }}
         run: |
           version="$(python3 scripts/bump-version.py "$BUMP" --dry-run)"
-          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          tag="v$version"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "::error::Tag $tag already exists; versions are never reused."
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
       - name: Generate release notes from Git history
         env:
           GH_TOKEN: ${{ github.token }}
@@ -51,16 +81,21 @@ jobs:
         run: |
           gh api --method POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
             -f tag_name="$RELEASE_TAG" -f target_commitish="$GITHUB_SHA" \
-            --jq .body > /tmp/release-notes.md
+            --jq .body > "$RUNNER_TEMP/release-notes.md"
       - name: Commit the version and create the release tag atomically
         env:
           BUMP: ${{ inputs.bump }}
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
         run: |
           git fetch origin main
-          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
-          python3 scripts/bump-version.py "$BUMP" --notes-file /tmp/release-notes.md
+          if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+            echo "::error::main moved while CI ran; rerun the release against the latest main."
+            exit 1
+          fi
+          python3 scripts/bump-version.py "$BUMP" --notes-file "$RUNNER_TEMP/release-notes.md"
           python3 scripts/check-release.py --tag "$RELEASE_TAG"
+          # The bump must touch only the package version line in Cargo.lock.
+          cargo metadata --locked --format-version 1 > /dev/null
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add Cargo.toml Cargo.lock CHANGELOG.md

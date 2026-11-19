@@ -1,0 +1,27 @@
+version: 2
+updates:
+  # Rust dependencies: compatible (minor/patch) updates are grouped into one weekly
+  # PR; major bumps get their own PRs. Every PR runs full CI including cargo deny.
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: deps
+    groups:
+      cargo-compatible:
+        update-types: [minor, patch]
+
+  # SHA-pinned GitHub Actions: Dependabot bumps the SHA and its version comment.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ['*']

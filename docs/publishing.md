@@ -29,6 +29,36 @@ This uses the built-in GitHub token and does not require organization permission
 for bots to create pull requests. The publisher is invoked directly: it does not
 rely on bot-created tag events triggering another workflow.
 
+Releases run only from `main`: **Run release** and manual **Publish pscon** runs
+fail immediately on any other branch, and a release is refused when `main` has no
+commits since the last tag or the next tag already exists.
+
+## CI pipeline
+
+`ci.yml` runs on pull requests, pushes to `main`, and again inside every release
+(on `main` before the version bump, then on the tag before publishing). Its jobs
+run in parallel, and the `CI passed` job is the single status to require in
+branch protection:
+
+| Job | Checks |
+| --- | --- |
+| Lint | version/lockfile/changelog consistency, `cargo fmt --check`, `cargo clippy -D warnings` |
+| Test | `cargo test --locked --all-features` |
+| Dependencies | `Cargo.lock` committed and current, `cargo deny check` |
+| Verify registry archive | `cargo package` builds the exact crate crates.io receives |
+
+## Dependency tracking
+
+- `deny.toml` is the dependency policy: RustSec vulnerabilities, unmaintained
+  and yanked crates fail CI; licenses must be on the Apache-2.0-compatible allow
+  list; only crates.io sources are allowed; wildcard versions are rejected.
+  Advisory exceptions live in `deny.toml` with a reason and should be removed
+  when the upstream fix lands.
+- `audit.yml` re-checks `Cargo.lock` on `main` against RustSec daily, since
+  new advisories appear without code changes.
+- Dependabot (`.github/dependabot.yml`) opens weekly PRs: grouped minor/patch
+  Cargo updates, separate major bumps, and SHA-pinned GitHub Action updates.
+
 ## Version and credential checks
 
 CI rejects mismatches between the crate version, lockfile, changelog, and release

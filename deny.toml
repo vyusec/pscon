@@ -1,0 +1,47 @@
+# Dependency policy enforced by `cargo deny check` in CI and before every release.
+# https://embarkstudios.github.io/cargo-deny/
+
+[graph]
+all-features = true
+
+[advisories]
+# RustSec advisories: vulnerabilities fail the build, as do unmaintained or
+# yanked crates anywhere in the dependency tree.
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked = "deny"
+unmaintained = "all"
+# Every exception needs a reason and should be removed once the dependency moves on.
+# Vulnerability advisories must never be ignored here without a fix plan.
+ignore = [
+    { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained notice; no known vulnerability. Track migration to jiff." },
+    { id = "RUSTSEC-2026-0370", reason = "zvariant via notify-rust -> zbus 5; resolved when notify-rust adopts zbus 6." },
+    { id = "RUSTSEC-2026-0371", reason = "zbus_names via notify-rust -> zbus 5; resolved when notify-rust adopts zbus 6." },
+    { id = "RUSTSEC-2026-0372", reason = "zvariant_derive via notify-rust -> zbus 5; resolved when notify-rust adopts zbus 6." },
+]
+
+[licenses]
+# Every dependency must be under a license compatible with Apache-2.0 distribution.
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "CDLA-Permissive-2.0",
+    "MPL-2.0",
+]
+confidence-threshold = 0.9
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+# Only crates.io; git or alternate registries must be added here deliberately.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

@@ -14,12 +14,89 @@ on:
 permissions:
   contents: read
 
+# Superseded pull request runs are cancelled; main pushes and release
+# verification (run_id is unique) always run to completion.
+concurrency:
+  group: ci-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}', github.run_id, inputs.ref) }}
+  cancel-in-progress: true
+
 env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: '0'
   CARGO_PROFILE_DEV_DEBUG: '0'
   CARGO_PROFILE_TEST_DEBUG: '0'
+  RUSTFLAGS: -D warnings
 
 jobs:
-  verify:
+  lint:
+    name: Lint (versions, fmt, clippy)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      - name: Install the pinned Rust toolchain
+        run: rustup show
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: rust-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-lint
+          restore-keys: rust-${{ runner.os }}-
+      - name: Check version, lockfile, and changelog consistency
+        run: python3 scripts/check-release.py
+      - name: Check formatting
+        run: cargo fmt --check
+      - name: Clippy
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
+
+  test:
+    name: Test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      - name: Install the pinned Rust toolchain
+        run: rustup show
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: rust-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-test
+          restore-keys: rust-${{ runner.os }}-
+      - name: Test
+        run: cargo test --locked --all-features
+
+  dependencies:
+    name: Dependencies (advisories, licenses, bans, sources)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      - name: Install the pinned Rust toolchain
+        run: rustup show
+      - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f # v2.90.6
+        with:
+          tool: cargo-deny@0.20.2
+      - name: Lockfile must be committed and current
+        run: cargo metadata --locked --format-version 1 > /dev/null
+      - name: cargo deny
+        run: cargo deny --locked check
+
+  package:
+    name: Verify registry archive
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
@@ -36,13 +113,23 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: rust-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-ci
+          key: rust-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-package
           restore-keys: rust-${{ runner.os }}-
-      - name: Check version consistency
-        run: python3 scripts/check-release.py
-      - name: Check formatting
-        run: cargo fmt --check
-      - name: Test
-        run: cargo test --locked
-      - name: Verify the actual registry archive
+      - name: Build and verify the crate exactly as crates.io will receive it
         run: cargo package --package pscon --locked --registry crates-io
+
+  # Single required status for branch protection: passes only if every job passed.
+  ci-ok:
+    name: CI passed
+    if: always()
+    needs: [lint, test, dependencies, package]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require all CI jobs to succeed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Job results: $RESULTS"
+          for result in $RESULTS; do
+            [ "$result" = success ] || exit 1
+          done

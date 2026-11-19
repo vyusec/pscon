@@ -23,7 +23,28 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Manual retries must use main's copy of this workflow, and every published
+  # tag must be a stable vX.Y.Z tag (its commit is checked against main below).
+  guard:
+    name: Require main / release tag
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check trigger
+        env:
+          EVENT: ${{ github.event_name }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          if [ "$EVENT" = workflow_dispatch ] && [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "::error::Run Publish pscon from main (got $GITHUB_REF)."
+            exit 1
+          fi
+          if ! [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::$RELEASE_TAG is not a stable vX.Y.Z release tag."
+            exit 1
+          fi
+
   verify:
+    needs: guard
     uses: ./.github/workflows/ci.yml
     with:
       ref: ${{ inputs.tag || github.ref_name }}
